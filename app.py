@@ -3,6 +3,7 @@ from flask_login import LoginManager, login_user, current_user, logout_user, log
 from database import db
 import bcrypt
 from datetime import datetime
+from models.user import User
 
 # Inicializa o Flask
 app = Flask(__name__)
@@ -32,3 +33,28 @@ def hello_world():
 # Inicia o servidor Flask
 if __name__ == '__main__':
     app.run(debug=True)
+
+# Rota de login
+@app.route('/login', methods=["POST"])
+def login():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+
+    if username and password:
+        # Busca o usuário no banco de dados
+        user = User.query.filter_by(username=username).first()
+
+        # Verifica se o usuário existe e se a senha está correta
+        if user and bcrypt.checkpw(str.encode(password), str.encode(user.password)):
+            login_user(user)  # Autentica o usuário
+            return jsonify({"message": "Autenticação realizada com sucesso"})
+    
+    return jsonify({"message": "Credenciais inválidas"}), 400
+
+# Rota de logout
+@app.route('/logout', methods=['GET'])
+@login_required
+def logout():
+    logout_user()  # Desautentica o usuário
+    return jsonify({"message": "Logout realizado com sucesso!"})
