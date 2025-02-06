@@ -10,8 +10,8 @@ from models.meal import Meal
 app = Flask(__name__)
 
 # Configurações do Flask
-app.config['SECRET_KEY'] = "your_secret_key"  # Chave secreta para sessões
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:admin123@127.0.0.1:3306/flask-crud'  # Conexão com o banco de dados
+app.config['SECRET_KEY'] = "your_secret_key"
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:admin123@127.0.0.1:3306/flask-crud'
 
 # Inicializa o SQLAlchemy e o LoginManager
 db.init_app(app)
@@ -30,10 +30,6 @@ def load_user(user_id):
 @app.route("/hello-world", methods=["GET"])
 def hello_world():
     return "Hello world"
-
-# Inicia o servidor Flask
-if __name__ == '__main__':
-    app.run(debug=True)
 
 # Rota de login
 @app.route('/login', methods=["POST"])
@@ -105,3 +101,53 @@ def list_meals():
             "in_diet": meal.in_diet
         })
     return jsonify(meals_list)
+
+# Rota para atualizar uma refeição
+@app.route('/meal/<int:id_meal>', methods=["PUT"])
+@login_required
+def update_meal(id_meal):
+    meal = Meal.query.get(id_meal)
+
+    # Verifica se a refeição existe e pertence ao usuário autenticado
+    if not meal or meal.user_id != current_user.id:
+        return jsonify({"message": "Refeição não encontrada ou não pertence ao usuário"}), 404
+
+    data = request.json
+    name = data.get("name")
+    description = data.get("description")
+    date_time = data.get("date_time")
+    in_diet = data.get("in_diet")
+
+    # Atualiza os campos fornecidos
+    if name:
+        meal.name = name
+    if description:
+        meal.description = description
+    if date_time:
+        try:
+            meal.date_time = datetime.strptime(date_time, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return jsonify({"message": "Formato de data inválido. Use 'YYYY-MM-DD HH:MM:SS'"}), 400
+    if in_diet is not None:
+        meal.in_diet = in_diet
+
+    db.session.commit()
+    return jsonify({"message": "Refeição atualizada com sucesso"})
+
+# Rota para deletar uma refeição
+@app.route('/meal/<int:id_meal>', methods=["DELETE"])
+@login_required
+def delete_meal(id_meal):
+    meal = Meal.query.get(id_meal)
+
+    # Verifica se a refeição existe e pertence ao usuário autenticado
+    if not meal or meal.user_id != current_user.id:
+        return jsonify({"message": "Refeição não encontrada ou não pertence ao usuário"}), 404
+
+    db.session.delete(meal)
+    db.session.commit()
+    return jsonify({"message": "Refeição deletada com sucesso"})
+
+# Inicia o servidor Flask
+if __name__ == '__main__':
+    app.run(debug=True)
