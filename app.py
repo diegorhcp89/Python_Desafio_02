@@ -4,6 +4,7 @@ from database import db
 import bcrypt
 from datetime import datetime
 from models.user import User
+from models.meal import Meal
 
 # Inicializa o Flask
 app = Flask(__name__)
@@ -58,3 +59,49 @@ def login():
 def logout():
     logout_user()  # Desautentica o usuário
     return jsonify({"message": "Logout realizado com sucesso!"})
+
+# Rota para registrar uma refeição
+@app.route('/meal', methods=["POST"])
+@login_required
+def create_meal():
+    data = request.json
+    name = data.get("name")
+    description = data.get("description")
+    date_time = data.get("date_time")  # Formato esperado: "YYYY-MM-DD HH:MM:SS"
+    in_diet = data.get("in_diet")
+
+    if name and description and date_time and in_diet is not None:
+        try:
+            date_time = datetime.strptime(date_time, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return jsonify({"message": "Formato de data inválido. Use 'YYYY-MM-DD HH:MM:SS'"}), 400
+
+        # Cria uma nova refeição
+        meal = Meal(
+            name=name,
+            description=description,
+            date_time=date_time,
+            in_diet=in_diet,
+            user_id=current_user.id  # Associa a refeição ao usuário autenticado
+        )
+        db.session.add(meal)
+        db.session.commit()
+        return jsonify({"message": "Refeição registrada com sucesso"}), 201
+
+    return jsonify({"message": "Dados inválidos"}), 400
+
+# Rota para listar todas as refeições do usuário
+@app.route('/meals', methods=["GET"])
+@login_required
+def list_meals():
+    meals = Meal.query.filter_by(user_id=current_user.id).all()
+    meals_list = []
+    for meal in meals:
+        meals_list.append({
+            "id": meal.id,
+            "name": meal.name,
+            "description": meal.description,
+            "date_time": meal.date_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "in_diet": meal.in_diet
+        })
+    return jsonify(meals_list)
